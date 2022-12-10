@@ -1,0 +1,21 @@
+﻿@inherits LayoutComponentBase
+
+<MudThemeProvider/>
+<MudDialogProvider/>
+<MudSnackbarProvider/>
+
+<MudLayout Class="mud-height-full">
+    <MudAppBar Elevation="1" style="background-color: #0f171f; color: #ffffff;">
+        <AppBar />
+    </MudAppBar>
+    <MudDrawer @bind-Open="@_drawerOpen" Width="200px" Style="background-color: #1b242f; color: #ffffff;">
+        <DrawerMenu />
+    </MudDrawer>
+    <MudMainContent Style="height: 100%; background-color: #0f171f; color: #ffffff;">
+        @Body
+    </MudMainContent>
+</MudLayout>
+
+@code {
+    bool _drawerOpen = true;
+}

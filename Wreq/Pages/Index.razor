@@ -1,0 +1,153 @@
+﻿@page "/"
+@using Wreq.Models
+@using Wreq.Services.IServices;
+@inject IMovieDbService _movieDBService
+@inject ICollectionService _collectionService
+@inject ISnackbar _snackbar
+@inject IFirebaseDbService _firebaseDbService
+@inject AuthenticationStateProvider _authState
+
+<MudPaper Class="d-flex py-2" Style="background-color: #1b242f; color: #ffffff;">
+    <MudChipSet Class="d-flex ps-2" @onclick="ChangeMediaType" @bind-SelectedChip="SelectedMediaChip">
+        <MudChip Default="true" Color="Color.Primary" Text="Movie">Movie</MudChip>
+        <MudChip Color="Color.Secondary" Text="Tv">Tv Shows</MudChip>
+    </MudChipSet>
+
+    <MudDivider Class="mx-3" Vertical="true" FlexItem="true" />
+
+    <div class="d-flex justify-content-center align-items-center" style="margin: 8px !important;">
+        <MudButtonGroup Color="Color.Primary" Variant="Variant.Outlined">
+            <MudButton>@GenreName</MudButton>
+            <MudMenu Icon="@Icons.Material.Filled.ArrowDropDown">
+                @if(SelectedMediaChip.Text == "Movie")
+                {
+                    @foreach(var genre in MovieGenres)
+                    {
+                        <MudMenuItem OnClick="@(() => GetGenre(@genre.Item1, @genre.Item2))">@genre.Item1</MudMenuItem>
+                    }
+                }
+                else
+                {
+                    @foreach(var genre in ShowGenres)
+                    {
+                        <MudMenuItem OnClick="@(() => GetGenre(@genre.Item1, @genre.Item2))">@genre.Item1</MudMenuItem>
+                    }
+                }
+            </MudMenu>
+        </MudButtonGroup>
+    </div>
+    <MudSpacer />
+</MudPaper>
+
+<div class="my-5">
+    <MudText Class="my-2 ms-5" Typo="Typo.h4">@MediaTitle</MudText>
+    <MudContainer Fixed="true">
+        <div class="movie-container">
+            <InfiniteScroll ObserverTargetId="observerTarget" ObservableTargetReached="(e) => SearchRefresh()">
+
+                @foreach(var movie in MediaResults)
+                {
+                    <MudCard Class="card my-3 movie-card">
+                        <MudImage Src="@($"https://image.tmdb.org/t/p/original/{movie.PosterPath}")" ObjectFit="ObjectFit.Cover" Width="200"/>
+                        <div class="card-overlay">
+                            <div class="overlay-text">
+                                <h3 class="my-5">@movie.Title</h3>
+                                <MudSpacer />
+                                <MudButton OnClick="@(()=>HandleRequest(movie))" Variant="Variant.Filled" Color="Color.Primary" FullWidth="true">Request</MudButton>
+                            </div>
+                        </div>
+                    </MudCard>
+                }
+                    <div id="observerTarget"> </div>
+            </InfiniteScroll>
+        </div>
+    </MudContainer>
+</div>
+
+@code {
+    private List<Result> MediaResults { get; set; } = new List<Result>();
+    public string? Genre { get; set; }
+    public string? GenreName { get; set; } = "Genre";
+    private string MediaTitle { get; set; } = "Movie";
+    public MudChip? SelectedMediaChip { get; set; }
+    private string Username = "";
+    private SettingsModel? SettingsModel { get; set; } = new();
+    private int PageIndex = 1;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var state = await _authState.GetAuthenticationStateAsync();
+        Username = state.User.Claims.FirstOrDefault(c => c.Type == "nickname")?.Value;
+        if(SettingsModel is not null)
+        {
+            SettingsModel = await _firebaseDbService.ReadSettings(Username, "radarr");
+        }
+        
+        await SearchRefresh();
+    }
+
+    List<(string, string)> MovieGenres = new()
+    {
+        ("Animation", "16"), ("Documentary", "99"), ("Fantasy", "14"), ("Music", "10402"), ("Science Fiction", "878"), ("Western", "37"), ("Action", "28"), ("Comedy", "35"), ("Drama", "18"), ("History", "36"), ("Mystery", "9648"), ("Thriller", "53"), ("Adventure", "12"), ("Crime", "80"), ("Family", "10751"), ("Horror", "27"), ("Romance", "10749"), ("War", "10752"), ("Tv Movie", "10770")
+    };
+
+    List<(string, string)> ShowGenres = new()
+    {
+        ("Action & Adventure", "10759"), ("Animation", "16"), ("Comedy", "35"), ("Crime", "80"), ("Documentary", "99"), ("Drama", "18"), ("Family", "10751"), ("Kids", "10762"), ("Mystery", "9648"), ("News", "10763"), ("Reality", "10764"), ("Sci-Fi & Fantasy", "10765"), ("Soap", "10766"), ("Talk", "10767"), ("War & Politics", "10768"), ("Western", "37")
+    };
+
+    public async void GetGenre(string genreName, string genreId)
+    {
+        MediaResults.Clear();
+        PageIndex = 1;
+        GenreName = genreName;
+        Genre = genreId;
+        await SearchRefresh();
+    }
+
+    public async Task ChangeMediaType()
+    {
+        MediaResults.Clear();
+        PageIndex = 1;
+        GenreName = "Genre";
+        Genre = null;
+        await SearchRefresh();
+    }
+
+    public async Task SearchRefresh()
+    {
+        if(SelectedMediaChip is null)
+        {
+            MediaTitle = "Movie";
+        }
+        else
+        {
+            //change mediatitle to selected mediachip
+            MediaTitle = SelectedMediaChip.Text;
+        }
+
+        var results = await _movieDBService.GetAsync(MediaTitle, Genre, PageIndex);
+        PageIndex = PageIndex + 1;
+        MediaResults.AddRange(results);
+        StateHasChanged();
+    }
+
+    private async Task HandleRequest(Result movie)
+    {
+        ProfilesModel profile = await _firebaseDbService.ReadProfiles(Username);
+
+        PostModel post = new()
+        {
+            Title = movie.Title,
+            TMDBID = movie.Id.ToString(),
+            QualityProfileId = profile.Id.ToString(),
+            //TODO: Get root path
+            RootFolderPath = "D:\\",
+        };
+        var response = await _collectionService.PostAsync(post, SettingsModel);
+        if(response)
+        {
+            _snackbar.Add("Requested Successfully", Severity.Success);
+        }
+    }
+}

@@ -1,0 +1,13 @@
+﻿<MudNavMenu Class="mt-5" Color="Color.Info">
+    <MudNavLink Href="/" Icon="@Icons.Filled.Storage">Browse</MudNavLink>
+    <MudDivider />
+    <AuthorizeView>
+        <Authorized>
+            <MudNavLink Href="/requests">Requests</MudNavLink>
+            <MudNavGroup Title="Settings" Expanded="true">
+                <MudNavLink Href="/settings/radarr">Radarr</MudNavLink>
+                <MudNavLink Href="/settings/sonarr">Sonarr</MudNavLink>
+            </MudNavGroup>
+        </Authorized>
+    </AuthorizeView>
+</MudNavMenu>

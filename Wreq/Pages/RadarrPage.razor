@@ -1,0 +1,95 @@
+﻿@page "/settings/radarr"
+@using Wreq.Services.IServices;
+@using System.Security.Claims;
+@using System.Diagnostics;
+@using Wreq.Models;
+@inject IFirebaseDbService _firebaseDbService
+@inject ISnackbar _snackbar
+@inject ICollectionService _collectionService
+@inject AuthenticationStateProvider _authState
+
+@attribute [Authorize]
+
+<MudContainer>
+    <EditForm Model="SettingsModel" OnValidSubmit="HandleOnSubmit">
+        <MudCard>
+            <MudCardContent>
+                <MudTextField Label="Ip/Hostname" HelperText="localhost" @bind-Value="SettingsModel.Hostname"
+                    For="@(() => SettingsModel.Hostname)"/>
+                <MudTextField Label="Port" HelperText="7878" @bind-Value="SettingsModel.Port"
+                    For="@(() => SettingsModel.Port)"/>
+                <MudTextField Label="Api Key" @bind-Value="SettingsModel.Apikey"
+                    For="@(() => SettingsModel.Apikey)"/>
+            </MudCardContent>
+            <MudCardActions>
+                <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary" Class="ml-auto">Submit</MudButton>
+            </MudCardActions>
+        </MudCard>
+    </EditForm>
+    @if(Profiles.Any())
+    {
+            <MudSelect @bind-Value="SelectedProfile" Label="Profiles" Variant="Variant.Filled" AnchorOrigin="Origin.BottomCenter">
+            @foreach(var profile in Profiles)
+            {
+                        <MudSelectItem Value="@profile">@profile.Name</MudSelectItem>
+            }
+            </MudSelect>
+    }
+</MudContainer>
+
+@code {
+    private SettingsModel? SettingsModel { get; set; } = new();
+    private IEnumerable<ProfilesModel> Profiles { get; set; } = new List<ProfilesModel>();
+    private string Username = "";
+
+    private ProfilesModel selectedProfile;
+    private ProfilesModel SelectedProfile
+    {
+        get
+        {
+            return this.selectedProfile;
+        }
+        set
+        {
+            this.selectedProfile = value;
+            SaveProfile();
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        var state = await _authState.GetAuthenticationStateAsync();
+        Username = state.User.Claims.FirstOrDefault(c => c.Type == "nickname")?.Value;
+        if(SettingsModel is not null)
+        {
+            SettingsModel = await _firebaseDbService.ReadSettings(Username, "radarr");
+        }
+    }
+
+    private async void HandleOnSubmit()
+    {
+        await _firebaseDbService.UpdateSettings(SettingsModel, Username, "radarr");
+        _snackbar.Add("Configuration added", Severity.Info);
+        Profiles = await _collectionService.GetProfilesAsync(SettingsModel);
+        if(Profiles.Count() > 0)
+        {
+            _snackbar.Add("Profiles found!", Severity.Success);
+            StateHasChanged();
+        }
+        else
+        {
+            _snackbar.Add("Could not find profiles, please try again", Severity.Error);
+        }
+
+        await SaveProfile();
+    }
+
+    private async Task SaveProfile()
+    {
+        var isSuccess = await _firebaseDbService.UpdateProfiles(SelectedProfile, Username);
+        if(isSuccess)
+        {
+            _snackbar.Add("Saved default profile", Severity.Success);
+        }
+    }
+}

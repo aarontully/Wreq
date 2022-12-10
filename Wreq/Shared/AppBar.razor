@@ -1,0 +1,14 @@
+﻿<MudText Typo="Typo.h3">Wreq</MudText>
+<MudSpacer />
+<AuthorizeView>
+    <Authorized>
+        <MudMenu Icon="@Icons.Material.Filled.Settings">
+            <MudMenuItem>Profile</MudMenuItem>
+            <MudMenuItem>My account</MudMenuItem>
+            <MudMenuItem Href="logout">Logout</MudMenuItem>
+        </MudMenu>
+    </Authorized>
+    <NotAuthorized>
+        <MudIconButton Href="login?redirectUri=/" Icon="@Icons.Filled.Login" Style="@($"color:{Colors.Shades.White};")" />
+    </NotAuthorized>
+</AuthorizeView>
